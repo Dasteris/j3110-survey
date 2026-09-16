@@ -15,9 +15,10 @@ service cloud.firestore {
       return n < 10 ? '0' + string(n) : string(n);
     }
 
-    // Понедельник текущей недели по Москве (UTC+3), YYYY-MM-DD — то же, что getWeekId() в common.js.
-    function currentWeekId() {
-      let msk = request.time + duration.value(3, 'h');
+    // Опрос про прошедшую неделю: понедельник ПРОШЛОЙ недели по Москве (UTC+3), YYYY-MM-DD —
+    // то же, что getSurveyWeekId() в common.js.
+    function surveyWeekId() {
+      let msk = request.time + duration.value(3, 'h') - duration.value(7, 'd');
       let monday = msk - duration.value(msk.dayOfWeek() - 1, 'd');
       return string(monday.year()) + '-' + pad2(monday.month()) + '-' + pad2(monday.day());
     }
@@ -26,7 +27,7 @@ service cloud.firestore {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == isu);
       allow create, update: if signedIn()
         && request.auth.uid == isu
-        && weekId == currentWeekId()
+        && weekId == surveyWeekId()
         && request.resource.data.keys().hasOnly(['isu', 'weekId', 'updatedAt', 'subjects', 'wellbeing'])
         && request.resource.data.isu == isu
         && request.resource.data.weekId == weekId

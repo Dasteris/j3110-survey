@@ -7,7 +7,7 @@
 // 3) Проверка без отправки: node scripts/send-reminders.js --key /путь/до/serviceAccount.json
 // 4) Отправка:              node scripts/send-reminders.js --key /путь/до/key.json --send
 //
-// Кому пишем: всем из roster.local.js, кроме старосты и тех, кто уже ответил на этой неделе.
+// Кому пишем: всем из roster.local.js, кроме старосты и тех, кто уже ответил про прошедшую неделю.
 // telegram.local.json хранит сессию = полный доступ к вашему Telegram. Не публикуйте его.
 
 const fs = require('fs');
@@ -17,7 +17,7 @@ const { TelegramClient, errors } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
-const { getWeekId } = require('../common.js');
+const { getSurveyWeekId } = require('../common.js');
 
 const PROJECT_DIR = path.join(__dirname, '..');
 const TELEGRAM_CONFIG_PATH = path.join(PROJECT_DIR, 'telegram.local.json');
@@ -32,7 +32,7 @@ const argValue = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] :
 function buildMessage(student, code) {
   const firstName = student.name.split(' ')[1] || student.name;
   return [
-    `Привет, ${firstName}! Началась новая неделя — анкета группы J3110 обновилась. Пара минут: оценки по предметам и как ты в целом.`,
+    `Привет, ${firstName}! Неделя закончилась — оцени её в анкете группы J3110. Пара минут: оценки по предметам и как ты в целом. Ответы принимаются до воскресенья.`,
     '',
     SITE_URL,
     `ИСУ: ${student.isu}`,
@@ -93,13 +93,13 @@ async function answeredThisWeek(keyPath, weekId) {
 async function planRecipients(keyPath) {
   const { STUDENTS } = require(path.join(PROJECT_DIR, 'roster.local.js'));
   const codes = JSON.parse(fs.readFileSync(CODES_PATH, 'utf8'));
-  const weekId = getWeekId();
+  const weekId = getSurveyWeekId();
   const answered = await answeredThisWeek(keyPath, weekId);
 
   const plan = STUDENTS.map((s) => {
     let skip = null;
     if (s.admin) skip = 'староста';
-    else if (answered.has(s.isu)) skip = 'уже ответили на этой неделе';
+    else if (answered.has(s.isu)) skip = 'уже ответили';
     else if (!USERNAME_RE.test(s.tg || '')) skip = `некорректный ник "${s.tg || ''}" — поправьте в roster.local.js`;
     else if (!codes[s.isu]) skip = 'нет кода в codes.local.json — выпустите через setup-firebase.js --reset';
     return { student: s, code: codes[s.isu], skip };

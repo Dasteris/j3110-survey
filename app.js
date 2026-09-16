@@ -140,12 +140,12 @@
   async function loadWeek() {
     const token = ++loadToken;
     clearTimeout(saveTimer);
-    weekId = getWeekId();
+    weekId = getSurveyWeekId();
     pruneOtherDrafts();
     answers = {};
     editVersion = 0;
     savedVersion = 0;
-    els.weekLabel.textContent = formatWeekLabel(weekId);
+    els.weekLabel.textContent = `Анкета про неделю ${formatWeekRange(weekId)} · ответы до ${formatSurveyDeadline(weekId)} включительно`;
     els.surveyBody.hidden = true;
     els.retryBtn.hidden = true;
     els.loadMessage.hidden = false;
@@ -203,7 +203,7 @@
     clearTimeout(saveTimer);
     if (!user || !weekId || editVersion === savedVersion) return;
     writeDraft();
-    if (getWeekId() !== weekId) return startNewWeek();
+    if (getSurveyWeekId() !== weekId) return startNewWeek();
 
     const version = editVersion;
     const token = loadToken;
@@ -232,15 +232,15 @@
     await loadWeek();
     setStatus(
       hadUnsaved
-        ? 'Началась новая неделя — несохранённые ответы за прошлую неделю отправить уже нельзя. Анкета обновлена.'
-        : 'Началась новая неделя — анкета обновлена.'
+        ? 'Приём ответов про ту неделю закрылся — несохранённые ответы отправить уже нельзя. Открыта анкета про только что прошедшую неделю.'
+        : 'Открыта анкета про только что прошедшую неделю.'
     );
   }
 
   document.addEventListener('visibilitychange', () => {
     if (!user || !weekId) return;
     if (document.visibilityState === 'hidden') flush();
-    else if (getWeekId() !== weekId) startNewWeek();
+    else if (getSurveyWeekId() !== weekId) startNewWeek();
   });
   window.addEventListener('online', flush);
 
@@ -350,7 +350,7 @@
     els.doneMessage.textContent =
       done === CARDS.length
         ? 'Спасибо! Все карточки заполнены.'
-        : `Полностью заполнено ${done} из ${CARDS.length} карточек — остальное можно дозаполнить до конца недели.`;
+        : `Полностью заполнено ${done} из ${CARDS.length} карточек — остальное можно дозаполнить до ${formatSurveyDeadline(weekId)}.`;
   });
 
   let touchStartX = null;

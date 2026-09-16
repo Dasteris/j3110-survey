@@ -39,7 +39,7 @@
   let docsByWeek = new Map(); // weekId -> [{ isu, subjects, wellbeing }]
   let averagesByWeek = new Map(); // weekId -> { [dimensionKey]: number | null }
   let weekIds = [];
-  let currentWeek = getWeekId();
+  let currentWeek = getSurveyWeekId();
   let detailMode = 'subject';
   let dataLoaded = false;
   const charts = {};
@@ -149,13 +149,13 @@
     }
     els.dashMessage.hidden = true;
 
-    currentWeek = getWeekId();
+    currentWeek = getSurveyWeekId();
     weekIds = [...new Set([...docsByWeek.keys(), currentWeek])].sort().reverse();
     averagesByWeek = new Map(weekIds.map((w) => [w, computeWeekAverages(w)]));
 
     populateSelect(
       els.weekSelect,
-      weekIds.map((w) => [w, formatWeekLabel(w) + (w === currentWeek ? ' (текущая)' : '')])
+      weekIds.map((w) => [w, formatWeekLabel(w) + (w === currentWeek ? ' (идёт опрос)' : '')])
     );
     els.weekSelect.value = currentWeek;
     populateSelect(els.profileSelect, roster.map((s) => [s.isu, s.name]));

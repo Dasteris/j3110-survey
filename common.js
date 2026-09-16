@@ -3,23 +3,37 @@
 const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
 const pad2 = (n) => String(n).padStart(2, '0');
 
-// Неделя = дата понедельника по московскому времени (YYYY-MM-DD), не зависит от часового пояса устройства.
+// Опрос всегда про прошедшую неделю (пн–вс по Москве) и открыт всю следующую неделю.
+// Возвращает дату понедельника оцениваемой недели (YYYY-MM-DD), не зависит от часового пояса устройства.
 // firestore.rules считают то же самое по серверному времени и не примут запись в другую неделю.
-function getWeekId(now = Date.now()) {
+function getSurveyWeekId(now = Date.now()) {
   const d = new Date(now + MSK_OFFSET_MS);
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) - 7);
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
 }
 
 // Для Node-скриптов (scripts/send-reminders.js); в браузере module не определён.
-if (typeof module !== 'undefined') module.exports = { getWeekId };
+if (typeof module !== 'undefined') module.exports = { getSurveyWeekId };
+
+function weekDate(weekId, plusDays) {
+  const [y, m, d] = weekId.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + plusDays));
+  return `${pad2(dt.getUTCDate())}.${pad2(dt.getUTCMonth() + 1)}`;
+}
+
+function formatWeekRange(weekId) {
+  const [y, m, d] = weekId.split('-').map(Number);
+  const sundayYear = new Date(Date.UTC(y, m - 1, d + 6)).getUTCFullYear();
+  return `${weekDate(weekId, 0)}–${weekDate(weekId, 6)}.${sundayYear}`;
+}
 
 function formatWeekLabel(weekId) {
-  const [y, m, d] = weekId.split('-').map(Number);
-  const monday = new Date(Date.UTC(y, m - 1, d));
-  const sunday = new Date(Date.UTC(y, m - 1, d + 6));
-  const fmt = (dt) => `${pad2(dt.getUTCDate())}.${pad2(dt.getUTCMonth() + 1)}`;
-  return `неделя ${fmt(monday)}–${fmt(sunday)}.${sunday.getUTCFullYear()}`;
+  return `неделя ${formatWeekRange(weekId)}`;
+}
+
+// Последний день, когда ещё принимаются ответы про эту неделю (воскресенье следующей недели).
+function formatSurveyDeadline(weekId) {
+  return weekDate(weekId, 13);
 }
 
 function isRating(v) {

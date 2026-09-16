@@ -65,8 +65,9 @@ p { margin: 0 0 8px; color: var(--muted); }
   gap: 8px;
 }
 .top-row h1 { margin: 0; }
-.top-actions { display: flex; gap: 6px; align-items: center; }
-.top-actions select { width: auto; margin-top: 0; }
+.top-row > :first-child { flex: 1 1 0; min-width: 0; }
+.top-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.top-actions select { width: auto; max-width: 100%; margin-top: 0; }
 .student-name { font-weight: 700; }
 
 .section { margin-top: 16px; }
