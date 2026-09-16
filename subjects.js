@@ -38,20 +38,20 @@ const SUBJECTS = [
     name: 'Дискретная математика',
     split: true,
     teacherLecture: 'Тарасова Елизавета Юрьевна',
-    teacherPractice: '',
+    teacherPractice: 'Архипов И.С.',
   },
   {
     key: 'arch',
     name: 'Архитектура вычислительных систем',
     split: true,
     teacherLecture: 'Береснев Артем Дмитриевич',
-    teacherPractice: '',
+    teacherPractice: 'Агафонов',
   },
   {
     key: 'english',
     name: 'Английский язык',
     split: false,
-    teacher: '',
+    teacher: '', // у каждого свой преподаватель — оценка идёт только в статистику предмета
   },
   {
     key: 'ai',
