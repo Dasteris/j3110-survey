@@ -38,14 +38,14 @@ const SUBJECTS = [
     name: 'Дискретная математика',
     split: true,
     teacherLecture: 'Тарасова Елизавета Юрьевна',
-    teacherPractice: 'Тарасова Елизавета Юрьевна',
+    teacherPractice: '',
   },
   {
     key: 'arch',
     name: 'Архитектура вычислительных систем',
     split: true,
     teacherLecture: 'Береснев Артем Дмитриевич',
-    teacherPractice: 'Береснев Артем Дмитриевич',
+    teacherPractice: '',
   },
   {
     key: 'english',
