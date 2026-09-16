@@ -129,11 +129,9 @@
   }
 
   function cardProgress(card) {
-    const a = answers[card.key] || {};
-    const fields = getCardFields(card);
-    const set = fields.filter((f) => isRating(a[f.key])).length;
+    const { set, total } = cardFill(card, answers[card.key]);
     if (set === 0) return 'empty';
-    return set === fields.length ? 'full' : 'partial';
+    return set === total ? 'full' : 'partial';
   }
 
   // Рисуем карточки только после ответа сервера, чтобы загрузка не затёрла то, что человек уже ввёл.
@@ -179,7 +177,7 @@
     els.loadMessage.hidden = true;
     els.surveyBody.hidden = false;
     setStatus('');
-    els.doneMessage.textContent = '';
+    els.doneMessage.hidden = true;
     renderCards();
     if (editVersion !== savedVersion) flush();
   }
@@ -193,7 +191,7 @@
 
   function markEdited() {
     editVersion++;
-    els.doneMessage.textContent = '';
+    els.doneMessage.hidden = true;
     setStatus('Сохранение…');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(flush, SAVE_DELAY_MS);
@@ -343,14 +341,41 @@
   }
 
   els.prevBtn.addEventListener('click', () => goTo(index - 1));
-  els.nextBtn.addEventListener('click', () => {
+  function showDone() {
+    const states = CARDS.map(cardProgress);
+    const full = states.filter((s) => s === 'full').length;
+    const deadline = formatSurveyDeadline(weekId);
+    let title;
+    let text;
+    let ok = false;
+    if (states.every((s) => s === 'empty')) {
+      title = 'Пока ничего не заполнено';
+      text = 'Выставьте оценки в карточках — они сохраняются сами.';
+    } else if (editVersion !== savedVersion) {
+      title = 'Ответы ещё не сохранились';
+      text = els.saveStatus.textContent || 'Проверьте интернет — ответы остались на этом устройстве и отправятся сами.';
+    } else {
+      ok = true;
+      title = '✓ Все ответы сохранены';
+      text =
+        full === CARDS.length
+          ? `Все карточки заполнены — спасибо! Поменять ответы можно до ${deadline}.`
+          : `Полностью заполнено ${full} из ${CARDS.length} карточек — остальное можно дозаполнить до ${deadline}.`;
+    }
+    els.doneMessage.className = `done-banner ${ok ? 'ok' : 'warn'}`;
+    els.doneMessage.replaceChildren(el('div', 'done-title', title), el('div', 'done-text', text));
+    els.doneMessage.hidden = false;
+    els.doneMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  els.nextBtn.addEventListener('click', async () => {
     if (index < CARDS.length - 1) return goTo(index + 1);
-    flush();
-    const done = CARDS.filter((card) => cardProgress(card) === 'full').length;
-    els.doneMessage.textContent =
-      done === CARDS.length
-        ? 'Спасибо! Все карточки заполнены.'
-        : `Полностью заполнено ${done} из ${CARDS.length} карточек — остальное можно дозаполнить до ${formatSurveyDeadline(weekId)}.`;
+    const token = loadToken;
+    els.nextBtn.disabled = true;
+    // Без сети set() ждёт восстановления связи — не держим человека дольше нескольких секунд.
+    await Promise.race([flush(), new Promise((resolve) => setTimeout(resolve, 8000))]);
+    els.nextBtn.disabled = false;
+    if (token === loadToken) showDone();
   });
 
   let touchStartX = null;

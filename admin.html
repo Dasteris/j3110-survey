@@ -43,11 +43,10 @@
     <p id="dash-message" hidden></p>
 
     <div class="card">
-      <h2>Кто ответил</h2>
-      <div class="grid">
-        <div class="stat"><div class="num" id="stat-responded">—</div><div class="lbl">ответили</div></div>
-      </div>
-      <div class="chip-list" id="missing-list"></div>
+      <h2>Кто сколько заполнил</h2>
+      <p>Процент выставленных оценок из всех карточек анкеты. Нажмите на имя, чтобы открыть профиль.</p>
+      <div class="progress-legend" id="progress-legend"></div>
+      <div class="chip-list" id="progress-list"></div>
     </div>
 
     <div class="card section">
@@ -92,11 +91,19 @@
       <div id="comments-list"></div>
     </div>
 
-    <div class="card section">
-      <h2>Профиль студента</h2>
-      <select id="profile-select"></select>
-      <div id="profile-detail"></div>
-    </div>
+    <dialog class="profile-dialog" id="profile-dialog">
+      <div class="dialog-body">
+        <div class="top-row">
+          <h2 id="profile-name"></h2>
+          <button class="ghost" id="profile-close">Закрыть</button>
+        </div>
+        <canvas id="chart-profile" height="150"></canvas>
+        <label for="profile-week">Неделя</label>
+        <select id="profile-week"></select>
+        <p class="profile-summary" id="profile-summary"></p>
+        <div id="profile-detail"></div>
+      </div>
+    </dialog>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>

@@ -11,8 +11,8 @@
     dashMessage: document.getElementById('dash-message'),
     dashLogout: document.getElementById('dash-logout'),
     weekSelect: document.getElementById('week-select'),
-    statResponded: document.getElementById('stat-responded'),
-    missingList: document.getElementById('missing-list'),
+    progressLegend: document.getElementById('progress-legend'),
+    progressList: document.getElementById('progress-list'),
     barCanvas: document.getElementById('chart-bar'),
     trendCanvas: document.getElementById('chart-trend'),
     subjectTableBody: document.querySelector('#subject-table tbody'),
@@ -22,7 +22,12 @@
     detailCanvas: document.getElementById('chart-detail'),
     detailComments: document.getElementById('detail-comments'),
     commentsList: document.getElementById('comments-list'),
-    profileSelect: document.getElementById('profile-select'),
+    profileDialog: document.getElementById('profile-dialog'),
+    profileName: document.getElementById('profile-name'),
+    profileClose: document.getElementById('profile-close'),
+    profileCanvas: document.getElementById('chart-profile'),
+    profileWeek: document.getElementById('profile-week'),
+    profileSummary: document.getElementById('profile-summary'),
     profileDetail: document.getElementById('profile-detail'),
   };
 
@@ -158,7 +163,6 @@
       weekIds.map((w) => [w, formatWeekLabel(w) + (w === currentWeek ? ' (идёт опрос)' : '')])
     );
     els.weekSelect.value = currentWeek;
-    populateSelect(els.profileSelect, roster.map((s) => [s.isu, s.name]));
     populateDetailSelect();
 
     renderTrendChart();
@@ -206,11 +210,46 @@
     return entry && typeof entry.comment === 'string' && entry.comment.trim();
   }
 
+  const ALL_CARDS = [...SUBJECTS, WELLBEING_CARD];
+  const PROGRESS_LEVELS = [
+    { cls: 'p-full', label: 'всё заполнено', matches: (p) => p === 1 },
+    { cls: 'p-most', label: 'больше половины', matches: (p) => p >= 0.5 },
+    { cls: 'p-some', label: 'меньше половины', matches: (p) => p > 0 },
+    { cls: 'p-none', label: 'не начали', matches: () => true },
+  ];
+
+  // Доля выставленных оценок по всем карточкам (0..1).
+  function progressOf(doc) {
+    let set = 0;
+    let total = 0;
+    ALL_CARDS.forEach((card) => {
+      const entry = doc && (card.isWellbeing ? doc.wellbeing : doc.subjects && doc.subjects[card.key]);
+      const fill = cardFill(card, entry);
+      set += fill.set;
+      total += fill.total;
+    });
+    return set / total;
+  }
+
   function renderCompletion() {
-    const responded = new Set(docsForWeek(currentWeek).map((d) => d.isu));
-    els.statResponded.textContent = `${roster.filter((s) => responded.has(s.isu)).length}/${roster.length}`;
-    els.missingList.replaceChildren(
-      ...roster.map((s) => el('span', responded.has(s.isu) ? 'chip' : 'chip missing', shortName(s.name)))
+    const docByIsu = new Map(docsForWeek(currentWeek).map((d) => [d.isu, d]));
+    const counts = new Map(PROGRESS_LEVELS.map((l) => [l, 0]));
+    const chips = roster.map((s) => {
+      const percent = Math.round(progressOf(docByIsu.get(s.isu)) * 100);
+      const level = PROGRESS_LEVELS.find((l) => l.matches(percent / 100));
+      counts.set(level, counts.get(level) + 1);
+      const chip = el('button', `chip ${level.cls}`, `${shortName(s.name)} · ${percent}%`);
+      chip.title = `${s.name}: ${percent}% — открыть профиль`;
+      chip.addEventListener('click', () => openProfile(s.isu));
+      return chip;
+    });
+    els.progressList.replaceChildren(...chips);
+    els.progressLegend.replaceChildren(
+      ...PROGRESS_LEVELS.map((l) => {
+        const item = el('span', 'legend-item');
+        item.append(el('span', `legend-dot ${l.cls}`), el('span', null, `${l.label}: ${counts.get(l)}`));
+        return item;
+      })
     );
   }
 
@@ -288,8 +327,46 @@
     return item;
   }
 
+  // --- профиль человека: график по всем неделям + ответы за выбранную неделю ---
+
+  let profileIsu = null;
+
+  function studentDoc(isu, week) {
+    return docsForWeek(week).find((d) => d.isu === isu);
+  }
+
+  function openProfile(isu) {
+    profileIsu = isu;
+    els.profileName.textContent = nameOf(isu);
+    populateSelect(
+      els.profileWeek,
+      weekIds.map((w) => [w, formatWeekLabel(w) + (studentDoc(isu, w) ? '' : ' — нет ответа')])
+    );
+    els.profileWeek.value = currentWeek;
+    els.profileDialog.showModal();
+    // График создаём после showModal: пока диалог скрыт, у canvas нет размеров.
+    const weeksAsc = [...weekIds].reverse();
+    lineChart(
+      'profile',
+      els.profileCanvas,
+      weeksAsc.map(formatWeekLabel),
+      DIMENSIONS.map((d) => ({
+        label: d.label,
+        data: weeksAsc.map((w) => {
+          const doc = studentDoc(isu, w);
+          const v = doc ? studentDimensions(doc)[d.key] : null;
+          return v === null ? null : Number(v.toFixed(2));
+        }),
+      }))
+    );
+    renderProfile();
+  }
+
   function renderProfile() {
-    const doc = docsForWeek(currentWeek).find((d) => d.isu === els.profileSelect.value);
+    const doc = studentDoc(profileIsu, els.profileWeek.value);
+    els.profileSummary.textContent = doc
+      ? `Заполнено ${Math.round(progressOf(doc) * 100)}% анкеты.`
+      : 'Нет ответа за эту неделю.';
     const items = [];
     if (doc) {
       SUBJECTS.forEach((s) => {
@@ -297,8 +374,14 @@
       });
       if (doc.wellbeing) items.push(profileItem(WELLBEING_CARD, doc.wellbeing));
     }
-    els.profileDetail.replaceChildren(...(items.length ? items : [el('p', null, 'Нет ответа за эту неделю.')]));
+    els.profileDetail.replaceChildren(...items);
   }
+
+  els.profileWeek.addEventListener('change', renderProfile);
+  els.profileClose.addEventListener('click', () => els.profileDialog.close());
+  els.profileDialog.addEventListener('click', (e) => {
+    if (e.target === els.profileDialog) els.profileDialog.close(); // клик по затемнению
+  });
 
   // --- по предмету / по преподавателю ---
 
@@ -400,14 +483,12 @@
     renderSubjectTable();
     renderDetailWeek();
     renderComments();
-    renderProfile();
   }
 
   els.weekSelect.addEventListener('change', () => {
     currentWeek = els.weekSelect.value;
     renderWeek();
   });
-  els.profileSelect.addEventListener('change', renderProfile);
   els.detailSelect.addEventListener('change', () => {
     renderDetailWeek();
     renderDetailChart();

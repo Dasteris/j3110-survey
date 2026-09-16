@@ -208,6 +208,16 @@ input[type="range"] {
 }
 .save-status.ok { color: var(--ok); }
 
+.done-banner { margin-top: 14px; padding: 14px 16px; border-radius: 12px; }
+.done-banner .done-title { font-weight: 700; font-size: 16px; }
+.done-banner .done-text { font-size: 14px; margin-top: 4px; }
+.done-banner.ok { background: #dcfce7; color: #166534; }
+.done-banner.warn { background: #fef3c7; color: #92400e; }
+@media (prefers-color-scheme: dark) {
+  .done-banner.ok { background: #12301d; color: #86efac; }
+  .done-banner.warn { background: #3a2f10; color: #fcd34d; }
+}
+
 /* --- Dashboard --- */
 
 .grid {
@@ -236,10 +246,25 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: upp
   background: var(--accent-soft);
   color: var(--accent);
 }
-.chip.missing { background: #fee2e2; color: #b91c1c; }
+
+/* Прогресс заполнения: зелёный → жёлтый → оранжевый → красный */
+.chip.p-full { background: #dcfce7; color: #166534; }
+.chip.p-most { background: #fef9c3; color: #854d0e; }
+.chip.p-some { background: #ffedd5; color: #9a3412; }
+.chip.p-none { background: #fee2e2; color: #b91c1c; }
+.legend-dot.p-full { background: #16a34a; }
+.legend-dot.p-most { background: #eab308; }
+.legend-dot.p-some { background: #f97316; }
+.legend-dot.p-none { background: #dc2626; }
 @media (prefers-color-scheme: dark) {
-  .chip.missing { background: #3a1616; color: #fca5a5; }
+  .chip.p-full { background: #12301d; color: #86efac; }
+  .chip.p-most { background: #332b0c; color: #fde047; }
+  .chip.p-some { background: #3a220f; color: #fdba74; }
+  .chip.p-none { background: #3a1616; color: #fca5a5; }
 }
+.progress-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
 .comment-item {
   border-bottom: 1px solid var(--border);
@@ -248,7 +273,23 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: upp
 .comment-item:last-child { border-bottom: none; }
 .comment-meta { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
 .profile-comment { margin-top: 4px; color: var(--muted); }
-#profile-detail { margin-top: 14px; }
+button.chip { font-weight: 400; cursor: pointer; }
+button.chip:hover { filter: brightness(0.95); }
+
+.profile-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  overflow: auto;
+}
+.profile-dialog::backdrop { background: rgba(10, 10, 20, 0.55); }
+.dialog-body { padding: 20px; }
+.profile-summary { margin-top: 12px; }
 #chart-detail { margin-top: 16px; }
 
 .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }

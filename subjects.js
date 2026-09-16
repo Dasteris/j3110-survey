@@ -91,6 +91,13 @@ function getCardFields(card) {
   ];
 }
 
+// Сколько оценок выставлено в ответе по карточке (комментарий не считается).
+function cardFill(card, entry) {
+  const fields = getCardFields(card);
+  const set = entry ? fields.filter((f) => isRating(entry[f.key])).length : 0;
+  return { set, total: fields.length };
+}
+
 // [{ name, roles: [{ subject, field }] }] — один преподаватель может вести несколько форматов/предметов.
 function getTeachers() {
   const byName = new Map();
