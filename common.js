@@ -11,6 +11,9 @@ function getWeekId(now = Date.now()) {
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
 }
 
+// Для Node-скриптов (scripts/send-reminders.js); в браузере module не определён.
+if (typeof module !== 'undefined') module.exports = { getWeekId };
+
 function formatWeekLabel(weekId) {
   const [y, m, d] = weekId.split('-').map(Number);
   const monday = new Date(Date.UTC(y, m - 1, d));

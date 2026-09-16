@@ -49,6 +49,32 @@ node scripts/setup-firebase.js /путь/до/key.json --reset-all
 Firestore Database и нажать **Get started** в Authentication — на это у
 сервисного аккаунта нет прав.
 
+## Рассылка в Telegram
+
+`scripts/send-reminders.js` пишет каждому с **вашего** аккаунта: просьбу пройти
+анкету, ссылку, ИСУ и код. Пропускает старосту и тех, кто уже ответил на этой
+неделе. Между сообщениями пауза 15–30 с. Бот здесь не подходит: он не может
+написать человеку по @нику первым.
+
+1. Возьмите `api_id` и `api_hash` на https://my.telegram.org → API development tools.
+2. Войдите один раз (сессия сохранится в `telegram.local.json` — это полный
+   доступ к вашему Telegram, никому не отдавайте):
+   ```bash
+   node scripts/send-reminders.js login
+   ```
+3. Проверка без отправки — кому уйдёт и пример текста:
+   ```bash
+   node scripts/send-reminders.js --key /путь/до/serviceAccount.json
+   ```
+4. Отправить сейчас: добавьте `--send`.
+5. Каждую неделю (по умолчанию пятница 18:00) через launchd. Ключ должен лежать
+   не в Downloads/Documents/Desktop — фоновые задания macOS туда не пускают:
+   ```bash
+   scripts/install-weekly-reminders.sh ~/.config/j3110-survey/serviceAccount.json
+   ```
+   Mac в это время должен быть включён (сон — ок, запустится при пробуждении).
+   Лог: `reminders.local.log`.
+
 ## Публикация
 
 GitHub Pages раздаёт ветку `main`: после `git push` сайт обновится за 1–2 минуты.
