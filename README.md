@@ -67,7 +67,7 @@ Firestore Database и нажать **Get started** в Authentication — на э
    node scripts/send-reminders.js --key /путь/до/serviceAccount.json
    ```
 4. Отправить сейчас: добавьте `--send`.
-5. Каждую неделю (по умолчанию пятница 18:00) через launchd. Ключ должен лежать
+5. Каждую неделю (по умолчанию понедельник 10:00, после сброса анкеты) через launchd. Ключ должен лежать
    не в Downloads/Documents/Desktop — фоновые задания macOS туда не пускают:
    ```bash
    scripts/install-weekly-reminders.sh ~/.config/j3110-survey/serviceAccount.json

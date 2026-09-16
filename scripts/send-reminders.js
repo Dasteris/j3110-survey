@@ -32,7 +32,7 @@ const argValue = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] :
 function buildMessage(student, code) {
   const firstName = student.name.split(' ')[1] || student.name;
   return [
-    `Привет, ${firstName}! Напоминаю про еженедельную анкету группы J3110 — пара минут: оценки по предметам и как ты в целом.`,
+    `Привет, ${firstName}! Началась новая неделя — анкета группы J3110 обновилась. Пара минут: оценки по предметам и как ты в целом.`,
     '',
     SITE_URL,
     `ИСУ: ${student.isu}`,
