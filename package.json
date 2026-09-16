@@ -1,0 +1,11 @@
+{
+  "name": "j3110-survey",
+  "private": true,
+  "description": "Статический сайт-опрос группы J3110 + дашборд. Нет шага сборки — package.json нужен только для локального скрипта scripts/setup-firebase.js.",
+  "scripts": {
+    "setup-firebase": "node scripts/setup-firebase.js"
+  },
+  "devDependencies": {
+    "firebase-admin": "^14.4.0"
+  }
+}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Опрос J3110</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div id="setup-banner" class="setup-banner" hidden>
+      ⚠️ Firebase ещё не настроен (firebase-config.js). Ответы не сохраняются, работает только просмотр интерфейса.
+    </div>
+
+    <!-- ЛОГИН -->
+    <div id="login-screen" class="card">
+      <h1>Опрос группы J3110</h1>
+      <p>Введите ваш табельный номер (ИСУ) и фамилию, как в списке группы.</p>
+      <label for="isu-input">ИСУ (табельный номер)</label>
+      <input id="isu-input" type="text" inputmode="numeric" autocomplete="off" placeholder="558825" />
+      <label for="surname-input">Фамилия</label>
+      <input id="surname-input" type="text" autocomplete="off" placeholder="Сериков" />
+      <div class="error-msg" id="login-error"></div>
+      <button id="login-btn" style="width:100%; margin-top:14px;">Войти</button>
+    </div>
+
+    <!-- ОПРОС -->
+    <div id="survey-screen" hidden>
+      <div class="top-row">
+        <div>
+          <div style="font-weight:700;" id="student-name"></div>
+          <div class="subject-sub" id="week-label"></div>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button class="ghost" id="admin-link" hidden>Дашборд</button>
+          <button class="ghost" id="logout-btn">Выйти</button>
+        </div>
+      </div>
+
+      <div class="progress-dots" id="progress-dots"></div>
+
+      <div class="carousel-viewport">
+        <div class="carousel-track" id="carousel-track"></div>
+      </div>
+
+      <div class="nav-row">
+        <button class="secondary" id="prev-btn">← Назад</button>
+        <button id="next-btn">Далее →</button>
+      </div>
+      <div class="save-status" id="save-status"></div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="common.js"></script>
+  <script src="roster.js"></script>
+  <script src="subjects.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

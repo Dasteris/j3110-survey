@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Любой, кто анонимно вошёл через приложение (Firebase Anonymous Auth),
+    // может читать и писать ответы опроса. Это не защищает от того, что
+    // одногруппник теоретически может открыть консоль браузера и отредактировать
+    // чужой ответ, но полностью закрывает базу от случайных ботов/чужих людей
+    // из интернета, которые не открывали сайт.
+    match /weeks/{weekId}/responses/{isu} {
+      allow read, write: if request.auth != null;
+    }
+    // Тот же доступ, но через рекурсивный шаблон — нужен, чтобы дашборд
+    // мог делать collectionGroup('responses') запрос сразу по всем неделям.
+    match /{path=**}/responses/{isu} {
+      allow read, write: if request.auth != null;
+    }
+    match /roster/{isu} {
+      allow read: if request.auth != null;
+      // Список группы правится только через локальный сид-скрипт (Admin SDK),
+      // а не с сайта, поэтому клиентам запись сюда не нужна.
+      allow write: if false;
+    }
+  }
+}
