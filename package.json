@@ -6,7 +6,6 @@
     "setup-firebase": "node scripts/setup-firebase.js"
   },
   "devDependencies": {
-    "firebase-admin": "^14.4.0",
-    "telegram": "^2.26.22"
+    "firebase-admin": "^14.4.0"
   }
 }

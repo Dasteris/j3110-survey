@@ -24,7 +24,8 @@
 
 - `roster.local.js` — список группы: ФИО, ИСУ, телеграм, кто староста.
 - `codes.local.json` — коды входа `{ "ИСУ": "код" }`.
-- Ключ сервисного аккаунта Firebase — держите вне папки проекта.
+- `telegram.local.json` — токен Telegram-бота; `bot-state.local.json` — чаты подключившихся.
+- Ключ сервисного аккаунта Firebase — держите вне папки проекта (сейчас `~/.config/j3110-survey/serviceAccount.json`).
 
 ## Настройка / изменения группы
 
@@ -51,31 +52,37 @@ node scripts/setup-firebase.js /путь/до/key.json --reset-all
 Firestore Database и нажать **Get started** в Authentication — на это у
 сервисного аккаунта нет прав.
 
-## Рассылка в Telegram
+## Telegram-бот
 
-`scripts/send-reminders.js` пишет каждому с **вашего** аккаунта: просьбу пройти
-анкету, ссылку, ИСУ и код. Пропускает старосту и тех, кто уже ответил на этой
-неделе. Между сообщениями пауза 15–30 с. Бот здесь не подходит: он не может
-написать человеку по @нику первым.
+`scripts/telegram-bot.js`: человек жмёт «Старт», бот ищет его @ник в
+`roster.local.js` и присылает объяснение, ссылку, ИСУ и код. По понедельникам
+с 10:00 МСК бот напоминает всем подключившимся, кто ещё не ответил. Если Mac в это
+время спал, напоминание уйдёт при пробуждении, но не чаще раза в неделю.
 
-1. Возьмите `api_id` и `api_hash` на https://my.telegram.org → API development tools.
-2. Войдите один раз (сессия сохранится в `telegram.local.json` — это полный
-   доступ к вашему Telegram, никому не отдавайте):
+1. Создайте бота в @BotFather (`/newbot`) и сохраните токен:
    ```bash
-   node scripts/send-reminders.js login
+   node scripts/telegram-bot.js setup
    ```
-3. Проверка без отправки — кому уйдёт и пример текста:
+2. Запустите бота в фоне. Он стартует сам при входе в систему и работает, пока
+   Mac включён:
    ```bash
-   node scripts/send-reminders.js --key /путь/до/serviceAccount.json
+   scripts/install-bot.sh ~/.config/j3110-survey/serviceAccount.json
    ```
-4. Отправить сейчас: добавьте `--send`.
-5. Каждую неделю (по умолчанию понедельник 10:00, после сброса анкеты) через launchd. Ключ должен лежать
-   не в Downloads/Documents/Desktop — фоновые задания macOS туда не пускают:
-   ```bash
-   scripts/install-weekly-reminders.sh ~/.config/j3110-survey/serviceAccount.json
-   ```
-   Mac в это время должен быть включён (сон — ок, запустится при пробуждении).
-   Лог: `reminders.local.log`.
+3. Скиньте группе ссылку на бота.
+
+Кто подключился и кому уйдёт напоминание:
+```bash
+node scripts/telegram-bot.js status --key ~/.config/j3110-survey/serviceAccount.json
+```
+
+Нюансы:
+- Если ник в таблице не совпал, бот попросит написать старосте. Поправьте
+  `roster.local.js`, и пусть человек нажмёт /start ещё раз — перезапуск не нужен.
+- Сообщения, пришедшие боту, Telegram хранит 24 часа. Если Mac был выключен
+  дольше, человеку нужно снова нажать /start.
+- Остановить бота:
+  `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.j3110-survey.bot.plist`.
+  Лог — `bot.local.log`.
 
 ## Публикация
 

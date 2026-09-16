@@ -12,8 +12,8 @@ function getSurveyWeekId(now = Date.now()) {
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
 }
 
-// Для Node-скриптов (scripts/send-reminders.js); в браузере module не определён.
-if (typeof module !== 'undefined') module.exports = { getSurveyWeekId };
+// Для Node-скриптов (scripts/telegram-bot.js); в браузере module не определён.
+if (typeof module !== 'undefined') module.exports = { getSurveyWeekId, formatSurveyDeadline };
 
 function weekDate(weekId, plusDays) {
   const [y, m, d] = weekId.split('-').map(Number);
