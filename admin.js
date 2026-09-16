@@ -19,7 +19,16 @@
     profileSelect: document.getElementById('profile-select'),
     profileDetail: document.getElementById('profile-detail'),
     dashLogout: document.getElementById('dash-logout'),
+    detailTabs: document.getElementById('detail-tabs'),
+    detailSelect: document.getElementById('detail-select'),
+    detailStats: document.getElementById('detail-stats'),
+    detailChart: document.getElementById('chart-detail'),
+    detailComments: document.getElementById('detail-comments'),
   };
+
+  const TEACHERS = getTeachers();
+  let detailMode = 'subject';
+  let detailChart = null;
 
   let allDocs = []; // flat list of every saved response across every week
   let weekIds = [];
@@ -114,6 +123,7 @@
     currentWeek = weekIds[0];
     populateWeekSelect();
     populateProfileSelect();
+    populateDetailSelect();
     renderAll();
   }
 
@@ -302,11 +312,138 @@
     els.profileDetail.innerHTML = html || '<p>Нет данных.</p>';
   }
 
+  function populateDetailSelect() {
+    const items =
+      detailMode === 'subject' ? SUBJECTS.map((s) => [s.key, s.name]) : TEACHERS.map((t) => [t.name, t.name]);
+    els.detailSelect.innerHTML = '';
+    items.forEach(([value, label]) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      els.detailSelect.appendChild(opt);
+    });
+  }
+
+  // Метрика = подпись + набор (предмет, поле), значения которых усредняются вместе.
+  function detailMetricDefs() {
+    const value = els.detailSelect.value;
+    if (detailMode === 'subject') {
+      const subject = SUBJECTS.find((s) => s.key === value);
+      if (!subject) return { metrics: [], subjectKeys: [] };
+      return {
+        subjectKeys: [subject.key],
+        metrics: getCardFields(subject).map((f) => ({
+          label: f.teacher ? `${f.label} (${f.teacher})` : f.label,
+          sources: [{ subjectKey: subject.key, fieldKey: f.key }],
+        })),
+      };
+    }
+    const teacher = TEACHERS.find((t) => t.name === value);
+    if (!teacher) return { metrics: [], subjectKeys: [] };
+    const subjectKeys = [...new Set(teacher.roles.map((r) => r.subject.key))];
+    const roleMetrics = teacher.roles.map((r) => ({
+      label: `${r.subject.name} — ${r.field.role}`,
+      sources: [{ subjectKey: r.subject.key, fieldKey: r.field.key }],
+    }));
+    const metrics = [];
+    if (roleMetrics.length > 1) {
+      metrics.push({ label: 'Общая оценка работы', sources: roleMetrics.flatMap((m) => m.sources) });
+    }
+    metrics.push(...roleMetrics);
+    metrics.push({
+      label: 'Понимание материала по его предметам',
+      sources: subjectKeys.map((k) => ({ subjectKey: k, fieldKey: 'understanding' })),
+    });
+    return { metrics, subjectKeys };
+  }
+
+  function metricValues(metric, week) {
+    const vals = [];
+    docsForWeek(week).forEach((doc) => {
+      metric.sources.forEach(({ subjectKey, fieldKey }) => {
+        const entry = doc.subjects && doc.subjects[subjectKey];
+        if (entry && typeof entry[fieldKey] === 'number') vals.push(entry[fieldKey]);
+      });
+    });
+    return vals;
+  }
+
+  function renderDetail() {
+    const { metrics, subjectKeys } = detailMetricDefs();
+
+    els.detailStats.innerHTML = '';
+    metrics.forEach((m) => {
+      const vals = metricValues(m, currentWeek);
+      const a = avg(vals);
+      const tile = document.createElement('div');
+      tile.className = 'stat';
+      const num = document.createElement('div');
+      num.className = 'num';
+      num.textContent = a === null ? '—' : a.toFixed(1);
+      const lbl = document.createElement('div');
+      lbl.className = 'lbl';
+      lbl.textContent = `${m.label} · оценок: ${vals.length}`;
+      tile.append(num, lbl);
+      els.detailStats.appendChild(tile);
+    });
+
+    const weeksAsc = [...weekIds].reverse();
+    if (detailChart) detailChart.destroy();
+    detailChart = new Chart(els.detailChart.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: weeksAsc.map(formatWeekLabel),
+        datasets: metrics.map((m, i) => ({
+          label: m.label,
+          data: weeksAsc.map((w) => {
+            const a = avg(metricValues(m, w));
+            return a === null ? null : Number(a.toFixed(2));
+          }),
+          borderColor: COLORS[i % COLORS.length],
+          backgroundColor: COLORS[i % COLORS.length],
+          spanGaps: true,
+          tension: 0.25,
+        })),
+      },
+      options: { scales: { y: { min: 0, max: 10 } } },
+    });
+
+    els.detailComments.innerHTML = '';
+    docsForWeek(currentWeek).forEach((doc) => {
+      subjectKeys.forEach((key) => {
+        const entry = doc.subjects && doc.subjects[key];
+        if (!entry || typeof entry.comment !== 'string' || !entry.comment.trim()) return;
+        const subject = SUBJECTS.find((s) => s.key === key);
+        const item = document.createElement('div');
+        item.className = 'comment-item';
+        const meta = document.createElement('div');
+        meta.className = 'comment-meta';
+        meta.textContent = `${doc.name || doc.isu} · ${subject.name}`;
+        const text = document.createElement('div');
+        text.textContent = entry.comment;
+        item.append(meta, text);
+        els.detailComments.appendChild(item);
+      });
+    });
+    if (!els.detailComments.children.length) els.detailComments.innerHTML = '<p>Комментариев нет.</p>';
+  }
+
+  els.detailTabs.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      detailMode = btn.dataset.mode;
+      els.detailTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
+      populateDetailSelect();
+      renderDetail();
+    });
+  });
+  els.detailSelect.addEventListener('change', renderDetail);
+
   function renderAll() {
     renderCompletion();
     renderBarChart();
     renderTrendChart();
     renderSubjectTable();
+    renderDetail();
     renderComments();
     renderProfile();
   }

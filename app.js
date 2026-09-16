@@ -28,23 +28,6 @@
 
   if (!FIREBASE_CONFIGURED) els.setupBanner.hidden = false;
 
-  function getCardFields(card) {
-    if (card.isWellbeing) return card.fields;
-    if (card.split) {
-      return [
-        { key: 'difficulty', label: 'Сложность материала' },
-        { key: 'lecture', label: 'Качество лекций' + (card.teacherLecture ? ` — ${card.teacherLecture}` : '') },
-        { key: 'practice', label: 'Качество практики/лаб' + (card.teacherPractice ? ` — ${card.teacherPractice}` : '') },
-        { key: 'understanding', label: 'Личное понимание материала' },
-      ];
-    }
-    return [
-      { key: 'difficulty', label: 'Сложность материала' },
-      { key: 'teacher', label: 'Работа преподавателя' + (card.teacher ? ` — ${card.teacher}` : '') },
-      { key: 'understanding', label: 'Личное понимание материала' },
-    ];
-  }
-
   function localKey() {
     return `j3110_answers_${WEEK_ID}_${student.isu}`;
   }
@@ -113,7 +96,7 @@
       const row = document.createElement('div');
       row.className = 'field-label-row';
       const lbl = document.createElement('span');
-      lbl.textContent = f.label;
+      lbl.textContent = f.teacher ? `${f.label} — ${f.teacher}` : f.label;
       const val = document.createElement('span');
       val.className = 'field-value';
       const current = a[f.key] !== undefined ? a[f.key] : 5;

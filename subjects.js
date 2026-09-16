@@ -49,7 +49,7 @@ const SUBJECTS = [
   },
   {
     key: 'english',
-    name: 'Английский язык A2',
+    name: 'Английский язык',
     split: false,
     teacher: '',
   },
@@ -72,3 +72,36 @@ const WELLBEING_CARD = {
     { key: 'atmosphere', label: 'Атмосфера в группе' },
   ],
 };
+
+// Поля карточки. `teacher` у поля = кого оценивает это поле, `role` = формат занятий.
+function getCardFields(card) {
+  if (card.isWellbeing) return card.fields;
+  if (card.split) {
+    return [
+      { key: 'difficulty', label: 'Сложность материала' },
+      { key: 'lecture', label: 'Качество лекций', teacher: card.teacherLecture, role: 'лекции' },
+      { key: 'practice', label: 'Качество практики/лаб', teacher: card.teacherPractice, role: 'практика' },
+      { key: 'understanding', label: 'Личное понимание материала' },
+    ];
+  }
+  return [
+    { key: 'difficulty', label: 'Сложность материала' },
+    { key: 'teacher', label: 'Работа преподавателя', teacher: card.teacher, role: 'занятия' },
+    { key: 'understanding', label: 'Личное понимание материала' },
+  ];
+}
+
+// [{ name, roles: [{ subject, field }] }] — один преподаватель может вести несколько форматов/предметов.
+function getTeachers() {
+  const byName = new Map();
+  SUBJECTS.forEach((subject) => {
+    getCardFields(subject).forEach((field) => {
+      if (!field.teacher) return;
+      if (!byName.has(field.teacher)) byName.set(field.teacher, []);
+      byName.get(field.teacher).push({ subject, field });
+    });
+  });
+  return [...byName.entries()]
+    .map(([name, roles]) => ({ name, roles }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}

@@ -67,6 +67,20 @@
     </div>
 
     <div class="card" style="margin-top:16px;">
+      <h2>Статистика по предмету / преподавателю</h2>
+      <p>Плитки и комментарии — за неделю из селектора сверху, график — по всем неделям.</p>
+      <div class="tabs" id="detail-tabs">
+        <button data-mode="subject" class="active">По предмету</button>
+        <button data-mode="teacher">По преподавателю</button>
+      </div>
+      <select id="detail-select"></select>
+      <div class="grid" id="detail-stats"></div>
+      <canvas id="chart-detail" height="130" style="margin-top:16px;"></canvas>
+      <h3 style="margin-top:18px;">Комментарии</h3>
+      <div id="detail-comments"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
       <h2>Комментарии — эта неделя</h2>
       <div id="comments-list"></div>
     </div>
