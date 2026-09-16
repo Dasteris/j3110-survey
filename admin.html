@@ -7,56 +7,62 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="wrap" id="gate-wrap">
-    <div class="card" id="gate-screen">
+  <div class="wrap" id="gate-wrap" hidden>
+    <div class="card" id="gate-screen" hidden>
       <h1>Дашборд</h1>
-      <p>Доступ только для старосты.</p>
+      <p>Доступ только для старосты. Войдите по ИСУ и личному коду.</p>
       <label for="g-isu">ИСУ</label>
-      <input id="g-isu" type="text" inputmode="numeric" autocomplete="off" />
-      <label for="g-surname">Фамилия</label>
-      <input id="g-surname" type="text" autocomplete="off" />
-      <label for="g-pass">Пароль</label>
-      <input id="g-pass" type="password" autocomplete="off" />
+      <input id="g-isu" type="text" inputmode="numeric" autocomplete="username" />
+      <label for="g-code">Код</label>
+      <input id="g-code" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" />
       <div class="error-msg" id="gate-error"></div>
-      <button id="gate-btn" style="width:100%; margin-top:14px;">Войти</button>
+      <button id="gate-btn" class="full-width">Войти</button>
+    </div>
+
+    <div class="card" id="denied-screen" hidden>
+      <h1>Нет доступа</h1>
+      <p id="denied-text"></p>
+      <div class="nav-row">
+        <a class="button secondary" href="./">К анкете</a>
+        <button id="denied-logout">Выйти</button>
+      </div>
     </div>
   </div>
 
   <div class="wrap wide" id="dash-wrap" hidden>
-    <div id="dash-banner" class="setup-banner" hidden>
-      ⚠️ Firebase не настроен — данных нет, дашборд покажет пустографики.
-    </div>
-
     <div class="top-row">
-      <h1 style="margin:0;">Дашборд J3110</h1>
-      <div style="display:flex; gap:8px; align-items:center;">
+      <h1>Дашборд J3110</h1>
+      <div class="top-actions">
         <select id="week-select"></select>
+        <a class="button ghost" href="./">К анкете</a>
         <button class="ghost" id="dash-logout">Выйти</button>
       </div>
     </div>
 
+    <p id="dash-message" hidden></p>
+
     <div class="card">
       <h2>Кто ответил на этой неделе</h2>
       <div class="grid">
-        <div class="stat"><div class="num" id="stat-responded">0/24</div><div class="lbl">ответили</div></div>
+        <div class="stat"><div class="num" id="stat-responded">—</div><div class="lbl">ответили</div></div>
       </div>
       <div class="chip-list" id="missing-list"></div>
     </div>
 
-    <div class="card" style="margin-top:16px;">
+    <div class="card section">
       <h2>Средние оценки по пунктам опроса — эта неделя</h2>
       <p>Оценки по предметам усреднены по всем дисциплинам (0–10).</p>
       <canvas id="chart-bar" height="120"></canvas>
     </div>
 
-    <div class="card" style="margin-top:16px;">
+    <div class="card section">
       <h2>Динамика по неделям</h2>
       <canvas id="chart-trend" height="140"></canvas>
     </div>
 
-    <div class="card" style="margin-top:16px;">
+    <div class="card section">
       <h2>По предметам — эта неделя</h2>
-      <div style="overflow-x:auto;">
+      <div class="table-scroll">
         <table id="subject-table">
           <thead>
             <tr><th>Предмет</th><th>Ответов</th><th>Сложность</th><th>Препод.</th><th>Понимание</th></tr>
@@ -66,7 +72,7 @@
       </div>
     </div>
 
-    <div class="card" style="margin-top:16px;">
+    <div class="card section">
       <h2>Статистика по предмету / преподавателю</h2>
       <p>Плитки и комментарии — за неделю из селектора сверху, график — по всем неделям.</p>
       <div class="tabs" id="detail-tabs">
@@ -75,20 +81,20 @@
       </div>
       <select id="detail-select"></select>
       <div class="grid" id="detail-stats"></div>
-      <canvas id="chart-detail" height="130" style="margin-top:16px;"></canvas>
-      <h3 style="margin-top:18px;">Комментарии</h3>
+      <canvas id="chart-detail" height="130"></canvas>
+      <h3>Комментарии</h3>
       <div id="detail-comments"></div>
     </div>
 
-    <div class="card" style="margin-top:16px;">
+    <div class="card section">
       <h2>Комментарии — эта неделя</h2>
       <div id="comments-list"></div>
     </div>
 
-    <div class="card" style="margin-top:16px;">
+    <div class="card section">
       <h2>Профиль студента</h2>
       <select id="profile-select"></select>
-      <div id="profile-detail" style="margin-top:14px;"></div>
+      <div id="profile-detail"></div>
     </div>
   </div>
 

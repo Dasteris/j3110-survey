@@ -8,46 +8,48 @@
 </head>
 <body>
   <div class="wrap">
-    <div id="setup-banner" class="setup-banner" hidden>
-      ⚠️ Firebase ещё не настроен (firebase-config.js). Ответы не сохраняются, работает только просмотр интерфейса.
-    </div>
-
     <!-- ЛОГИН -->
-    <div id="login-screen" class="card">
+    <div id="login-screen" class="card" hidden>
       <h1>Опрос группы J3110</h1>
-      <p>Введите ваш табельный номер (ИСУ) и фамилию, как в списке группы.</p>
+      <p>Войдите по номеру ИСУ и личному коду, который прислал староста.</p>
       <label for="isu-input">ИСУ (табельный номер)</label>
-      <input id="isu-input" type="text" inputmode="numeric" autocomplete="off" placeholder="Например: 400123" />
-      <label for="surname-input">Фамилия</label>
-      <input id="surname-input" type="text" autocomplete="off" placeholder="Например: Иванов" />
+      <input id="isu-input" type="text" inputmode="numeric" autocomplete="username" placeholder="Например: 400123" />
+      <label for="code-input">Код</label>
+      <input id="code-input" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" />
       <div class="error-msg" id="login-error"></div>
-      <button id="login-btn" style="width:100%; margin-top:14px;">Войти</button>
+      <button id="login-btn" class="full-width">Войти</button>
     </div>
 
     <!-- ОПРОС -->
     <div id="survey-screen" hidden>
       <div class="top-row">
         <div>
-          <div style="font-weight:700;" id="student-name"></div>
+          <div class="student-name" id="student-name"></div>
           <div class="subject-sub" id="week-label"></div>
         </div>
-        <div style="display:flex; gap:6px; align-items:center;">
+        <div class="top-actions">
           <button class="ghost" id="admin-link" hidden>Дашборд</button>
           <button class="ghost" id="logout-btn">Выйти</button>
         </div>
       </div>
 
-      <div class="progress-dots" id="progress-dots"></div>
+      <p id="load-message" hidden></p>
+      <button class="secondary" id="retry-btn" hidden>Повторить</button>
 
-      <div class="carousel-viewport">
-        <div class="carousel-track" id="carousel-track"></div>
-      </div>
+      <div id="survey-body" hidden>
+        <div class="progress-dots" id="progress-dots"></div>
 
-      <div class="nav-row">
-        <button class="secondary" id="prev-btn">← Назад</button>
-        <button id="next-btn">Далее →</button>
+        <div class="carousel-viewport" id="carousel-viewport">
+          <div class="carousel-track" id="carousel-track"></div>
+        </div>
+
+        <div class="nav-row">
+          <button class="secondary" id="prev-btn">← Назад</button>
+          <button id="next-btn">Далее →</button>
+        </div>
+        <div class="save-status" id="save-status"></div>
+        <div class="save-status ok" id="done-message"></div>
       </div>
-      <div class="save-status" id="save-status"></div>
     </div>
   </div>
 
@@ -56,7 +58,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
   <script src="firebase-config.js"></script>
   <script src="common.js"></script>
-  <script src="roster.js"></script>
   <script src="subjects.js"></script>
   <script src="app.js"></script>
 </body>

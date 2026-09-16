@@ -1,318 +1,382 @@
 (function () {
   const CARDS = [...SUBJECTS, WELLBEING_CARD];
-  const WEEK_ID = getWeekId();
+  const SAVE_DELAY_MS = 700;
 
   const els = {
-    setupBanner: document.getElementById('setup-banner'),
     loginScreen: document.getElementById('login-screen'),
     surveyScreen: document.getElementById('survey-screen'),
     isuInput: document.getElementById('isu-input'),
-    surnameInput: document.getElementById('surname-input'),
+    codeInput: document.getElementById('code-input'),
     loginBtn: document.getElementById('login-btn'),
     loginError: document.getElementById('login-error'),
     studentName: document.getElementById('student-name'),
     weekLabel: document.getElementById('week-label'),
     adminLink: document.getElementById('admin-link'),
     logoutBtn: document.getElementById('logout-btn'),
+    loadMessage: document.getElementById('load-message'),
+    retryBtn: document.getElementById('retry-btn'),
+    surveyBody: document.getElementById('survey-body'),
     dots: document.getElementById('progress-dots'),
+    viewport: document.getElementById('carousel-viewport'),
     track: document.getElementById('carousel-track'),
     prevBtn: document.getElementById('prev-btn'),
     nextBtn: document.getElementById('next-btn'),
     saveStatus: document.getElementById('save-status'),
+    doneMessage: document.getElementById('done-message'),
   };
 
-  let student = null;
-  let answers = {}; // { [cardKey]: {...fields, comment, _touched} }
+  let user = null;
+  let weekId = null;
+  let answers = {}; // { [cardKey]: { [fieldKey]: 0..10, comment } } — только то, что человек реально выставил
   let index = 0;
+  let dotEls = [];
   let saveTimer = null;
+  let editVersion = 0;
+  let savedVersion = 0;
+  let loadToken = 0;
 
-  if (!FIREBASE_CONFIGURED) els.setupBanner.hidden = false;
+  bindLoginForm({ isuInput: els.isuInput, codeInput: els.codeInput, button: els.loginBtn, errorEl: els.loginError });
 
-  function localKey() {
-    return `j3110_answers_${WEEK_ID}_${student.isu}`;
+  onAuthChange((u, isAdmin) => {
+    loadToken++;
+    clearTimeout(saveTimer);
+    user = u;
+    weekId = null;
+    els.loginScreen.hidden = !!u;
+    els.surveyScreen.hidden = !u;
+    if (!u) return;
+    els.studentName.textContent = u.displayName || u.uid;
+    els.adminLink.hidden = !isAdmin;
+    loadWeek();
+  });
+
+  // --- черновик на устройстве: неотправленные изменения переживают закрытие вкладки ---
+
+  function draftKey(week) {
+    return `j3110_draft_${week}_${user.uid}`;
   }
 
-  function loadLocalCache() {
+  function readDraft() {
     try {
-      const raw = localStorage.getItem(localKey());
-      return raw ? JSON.parse(raw) : {};
+      return JSON.parse(localStorage.getItem(draftKey(weekId)));
     } catch {
-      return {};
+      return null;
     }
   }
 
-  function saveLocalCache() {
+  function writeDraft() {
     try {
-      localStorage.setItem(localKey(), JSON.stringify(answers));
+      localStorage.setItem(draftKey(weekId), JSON.stringify({ answers, editedAt: Date.now() }));
     } catch {}
   }
 
-  function ensureCardAnswers(key) {
-    if (!answers[key]) answers[key] = {};
-    return answers[key];
+  function clearDraft() {
+    try {
+      localStorage.removeItem(draftKey(weekId));
+    } catch {}
   }
 
-  function isCardFilled(card) {
-    const a = answers[card.key];
-    return !!(a && a._touched);
+  // Черновики других недель отправить уже нельзя (или их создал сбитый вперёд часами телефон).
+  function pruneOtherDrafts() {
+    try {
+      const keep = draftKey(weekId);
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('j3110_draft_') && k.endsWith(`_${user.uid}`) && k !== keep)
+        .forEach((k) => localStorage.removeItem(k));
+    } catch {}
   }
 
-  function renderDots() {
-    els.dots.innerHTML = '';
-    CARDS.forEach((card, i) => {
-      const dot = document.createElement('div');
-      dot.className = 'dot' + (i === index ? ' active' : '') + (isCardFilled(card) ? ' filled' : '');
-      dot.title = card.name;
-      dot.addEventListener('click', () => goTo(i));
-      els.dots.appendChild(dot);
+  // --- данные ---
+
+  function parseCard(card, src) {
+    if (!src || typeof src !== 'object') return null;
+    const out = {};
+    getCardFields(card).forEach((f) => {
+      if (isRating(src[f.key])) out[f.key] = src[f.key];
     });
+    if (typeof src.comment === 'string' && src.comment.trim()) out.comment = src.comment;
+    return Object.keys(out).length ? out : null;
   }
 
-  function renderCard(card) {
-    const wrap = document.createElement('div');
-    wrap.className = 'survey-card card';
+  function normalizeAnswers(getSource) {
+    const result = {};
+    CARDS.forEach((card) => {
+      const parsed = parseCard(card, getSource(card));
+      if (parsed) result[card.key] = parsed;
+    });
+    return result;
+  }
 
-    const title = document.createElement('div');
-    title.className = 'subject-title';
-    title.textContent = card.name;
-    wrap.appendChild(title);
+  function buildPayload() {
+    const payload = {
+      isu: user.uid,
+      weekId,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      subjects: {},
+    };
+    CARDS.forEach((card) => {
+      const parsed = parseCard(card, answers[card.key]);
+      if (!parsed) return;
+      if (card.isWellbeing) payload.wellbeing = parsed;
+      else payload.subjects[card.key] = parsed;
+    });
+    return payload;
+  }
 
-    if (!card.isWellbeing) {
-      const sub = document.createElement('div');
-      sub.className = 'subject-sub';
-      sub.textContent = card.split
-        ? `Лекции: ${card.teacherLecture || '—'} · Практика: ${card.teacherPractice || '—'}`
-        : card.teacher || '';
-      wrap.appendChild(sub);
+  function cardAnswers(card) {
+    if (!answers[card.key]) answers[card.key] = {};
+    return answers[card.key];
+  }
+
+  function cardProgress(card) {
+    const a = answers[card.key] || {};
+    const fields = getCardFields(card);
+    const set = fields.filter((f) => isRating(a[f.key])).length;
+    if (set === 0) return 'empty';
+    return set === fields.length ? 'full' : 'partial';
+  }
+
+  // Рисуем карточки только после ответа сервера, чтобы загрузка не затёрла то, что человек уже ввёл.
+  async function loadWeek() {
+    const token = ++loadToken;
+    clearTimeout(saveTimer);
+    weekId = getWeekId();
+    pruneOtherDrafts();
+    answers = {};
+    editVersion = 0;
+    savedVersion = 0;
+    els.weekLabel.textContent = formatWeekLabel(weekId);
+    els.surveyBody.hidden = true;
+    els.retryBtn.hidden = true;
+    els.loadMessage.hidden = false;
+    els.loadMessage.textContent = 'Загружаем ваши ответы…';
+
+    let serverData;
+    try {
+      const snap = await responseRef(weekId, user.uid).get();
+      serverData = snap.exists ? snap.data() : null;
+    } catch (err) {
+      console.error(err);
+      if (token !== loadToken) return;
+      els.loadMessage.textContent = 'Не удалось загрузить ответы. Проверьте интернет и попробуйте ещё раз.';
+      els.retryBtn.hidden = false;
+      return;
+    }
+    if (token !== loadToken) return;
+
+    const serverUpdatedAt = serverData && serverData.updatedAt ? serverData.updatedAt.toMillis() : 0;
+    const draft = readDraft();
+    if (draft && draft.answers && draft.editedAt > serverUpdatedAt) {
+      answers = normalizeAnswers((card) => draft.answers[card.key]);
+      editVersion = 1;
+    } else {
+      answers = serverData
+        ? normalizeAnswers((card) => (card.isWellbeing ? serverData.wellbeing : serverData.subjects && serverData.subjects[card.key]))
+        : {};
+      clearDraft();
     }
 
-    const fields = getCardFields(card);
-    const a = ensureCardAnswers(card.key);
+    els.loadMessage.hidden = true;
+    els.surveyBody.hidden = false;
+    setStatus('');
+    els.doneMessage.textContent = '';
+    renderCards();
+    if (editVersion !== savedVersion) flush();
+  }
 
-    fields.forEach((f) => {
-      const block = document.createElement('div');
-      block.className = 'field-block';
+  // --- сохранение ---
 
-      const row = document.createElement('div');
-      row.className = 'field-label-row';
-      const lbl = document.createElement('span');
-      lbl.textContent = f.teacher ? `${f.label} — ${f.teacher}` : f.label;
-      const val = document.createElement('span');
-      val.className = 'field-value';
-      const current = a[f.key] !== undefined ? a[f.key] : 5;
-      val.textContent = current;
-      row.appendChild(lbl);
-      row.appendChild(val);
-      block.appendChild(row);
+  function setStatus(text, ok) {
+    els.saveStatus.textContent = text;
+    els.saveStatus.classList.toggle('ok', !!ok);
+  }
 
-      const range = document.createElement('input');
-      range.type = 'range';
-      range.min = '0';
-      range.max = '10';
-      range.step = '1';
-      range.value = current;
-      range.addEventListener('input', () => {
-        val.textContent = range.value;
-        a[f.key] = Number(range.value);
-        a._touched = true;
-        renderDots();
-        scheduleSave();
-      });
-      block.appendChild(range);
+  function markEdited() {
+    editVersion++;
+    els.doneMessage.textContent = '';
+    setStatus('Сохранение…');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, SAVE_DELAY_MS);
+  }
 
-      const scale = document.createElement('div');
-      scale.className = 'range-scale';
-      scale.innerHTML = '<span>0</span><span>10</span>';
-      block.appendChild(scale);
+  async function flush() {
+    clearTimeout(saveTimer);
+    if (!user || !weekId || editVersion === savedVersion) return;
+    writeDraft();
+    if (getWeekId() !== weekId) return startNewWeek();
 
-      wrap.appendChild(block);
-    });
+    const version = editVersion;
+    const token = loadToken;
+    try {
+      await responseRef(weekId, user.uid).set(buildPayload());
+      if (token !== loadToken) return;
+      savedVersion = Math.max(savedVersion, version);
+      if (savedVersion === editVersion) {
+        clearDraft();
+        setStatus('Сохранено ✓', true);
+      }
+    } catch (err) {
+      console.error(err);
+      if (token !== loadToken) return;
+      setStatus(
+        err.code === 'permission-denied'
+          ? 'Не удалось сохранить: проверьте дату и время на устройстве и обновите страницу.'
+          : 'Не удалось сохранить — ответы остались на этом устройстве, отправим при следующем изменении.'
+      );
+    }
+  }
 
-    const commentBlock = document.createElement('div');
-    commentBlock.className = 'field-block';
-    const commentLbl = document.createElement('label');
-    commentLbl.textContent = 'Комментарий (необязательно)';
-    commentLbl.style.marginTop = '0';
+  async function startNewWeek() {
+    const hadUnsaved = editVersion !== savedVersion;
+    clearDraft();
+    await loadWeek();
+    setStatus(
+      hadUnsaved
+        ? 'Началась новая неделя — несохранённые ответы за прошлую неделю отправить уже нельзя. Анкета обновлена.'
+        : 'Началась новая неделя — анкета обновлена.'
+    );
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!user || !weekId) return;
+    if (document.visibilityState === 'hidden') flush();
+    else if (getWeekId() !== weekId) startNewWeek();
+  });
+  window.addEventListener('online', flush);
+
+  // --- отрисовка ---
+
+  function updateDot(i) {
+    const state = cardProgress(CARDS[i]);
+    dotEls[i].classList.toggle('filled', state === 'full');
+    dotEls[i].classList.toggle('partial', state === 'partial');
+  }
+
+  function renderField(card, i, f) {
+    const block = el('div', 'field-block');
+    const row = el('div', 'field-label-row');
+    const value = el('span', 'field-value');
+    row.append(el('span', null, f.teacher ? `${f.label} — ${f.teacher}` : f.label), value);
+
+    const range = document.createElement('input');
+    range.type = 'range';
+    range.min = '0';
+    range.max = '10';
+    range.step = '1';
+
+    const current = (answers[card.key] || {})[f.key];
+    const isSet = isRating(current);
+    range.value = isSet ? current : 5;
+    value.textContent = isSet ? current : '—';
+    block.classList.toggle('unset', !isSet);
+
+    const commit = () => {
+      const a = cardAnswers(card);
+      const v = Number(range.value);
+      if (a[f.key] === v) return;
+      a[f.key] = v;
+      value.textContent = v;
+      block.classList.remove('unset');
+      updateDot(i);
+      markEdited();
+    };
+    range.addEventListener('input', commit);
+    // Тап по ползунку без сдвига не вызывает input — но это тоже ответ.
+    range.addEventListener('click', commit);
+
+    const scale = el('div', 'range-scale');
+    scale.append(el('span', null, '0'), el('span', null, '10'));
+    block.append(row, range, scale);
+    return block;
+  }
+
+  function renderCard(card, i) {
+    const wrap = el('div', 'survey-card card');
+    wrap.appendChild(el('div', 'subject-title', card.name));
+    if (!card.isWellbeing) {
+      const sub = card.split
+        ? `Лекции: ${card.teacherLecture || '—'} · Практика: ${card.teacherPractice || '—'}`
+        : card.teacher;
+      if (sub) wrap.appendChild(el('div', 'subject-sub', sub));
+    }
+
+    getCardFields(card).forEach((f) => wrap.appendChild(renderField(card, i, f)));
+
+    const commentBlock = el('div', 'field-block');
     const textarea = document.createElement('textarea');
     textarea.placeholder = 'Если хочется что-то добавить словами…';
-    textarea.value = a.comment || '';
+    textarea.maxLength = 2000;
+    textarea.value = (answers[card.key] && answers[card.key].comment) || '';
     textarea.addEventListener('input', () => {
-      a.comment = textarea.value;
-      if (textarea.value.trim()) a._touched = true;
-      scheduleSave();
+      cardAnswers(card).comment = textarea.value;
+      markEdited();
     });
-    commentBlock.appendChild(commentLbl);
-    commentBlock.appendChild(textarea);
+    commentBlock.append(el('label', null, 'Комментарий (необязательно)'), textarea);
     wrap.appendChild(commentBlock);
-
     return wrap;
   }
 
-  function renderTrack() {
-    els.track.innerHTML = '';
-    CARDS.forEach((card) => els.track.appendChild(renderCard(card)));
-    updateTrackPosition(false);
+  function renderCards() {
+    dotEls = CARDS.map((card, i) => {
+      const dot = el('div', 'dot');
+      dot.title = card.name;
+      dot.addEventListener('click', () => goTo(i));
+      return dot;
+    });
+    els.dots.replaceChildren(...dotEls);
+    CARDS.forEach((_, i) => updateDot(i));
+    els.track.replaceChildren(...CARDS.map(renderCard));
+    goTo(0, false);
   }
 
-  function updateTrackPosition(animate) {
-    els.track.style.transition = animate === false ? 'none' : '';
+  function goTo(i, animate = true) {
+    index = Math.max(0, Math.min(CARDS.length - 1, i));
+    els.track.style.transition = animate ? '' : 'none';
     els.track.style.transform = `translateX(-${index * 100}%)`;
-    if (animate === false) {
-      // force reflow then restore transition
+    if (!animate) {
       void els.track.offsetHeight;
       els.track.style.transition = '';
     }
+    dotEls.forEach((dot, j) => dot.classList.toggle('active', j === index));
     els.prevBtn.disabled = index === 0;
     els.nextBtn.textContent = index === CARDS.length - 1 ? 'Готово ✓' : 'Далее →';
   }
 
-  function goTo(i) {
-    index = Math.max(0, Math.min(CARDS.length - 1, i));
-    updateTrackPosition(true);
-    renderDots();
-  }
-
   els.prevBtn.addEventListener('click', () => goTo(index - 1));
   els.nextBtn.addEventListener('click', () => {
-    if (index === CARDS.length - 1) {
-      els.saveStatus.textContent = 'Спасибо! Ответы сохраняются автоматически, можно закрывать.';
-      els.saveStatus.className = 'save-status ok';
-      return;
-    }
-    goTo(index + 1);
+    if (index < CARDS.length - 1) return goTo(index + 1);
+    flush();
+    const done = CARDS.filter((card) => cardProgress(card) === 'full').length;
+    els.doneMessage.textContent =
+      done === CARDS.length
+        ? 'Спасибо! Все карточки заполнены.'
+        : `Полностью заполнено ${done} из ${CARDS.length} карточек — остальное можно дозаполнить до конца недели.`;
   });
 
-  // touch swipe
   let touchStartX = null;
-  const viewport = document.querySelector('.carousel-viewport');
-  viewport.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
+  els.viewport.addEventListener('touchstart', (e) => {
+    // Горизонтальное движение по ползунку — это выбор оценки, а не свайп карточки.
+    touchStartX = e.target.closest('input, textarea') ? null : e.touches[0].clientX;
   });
-  viewport.addEventListener('touchend', (e) => {
+  els.viewport.addEventListener('touchend', (e) => {
     if (touchStartX === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(dx) > 40) {
-      if (dx < 0) goTo(index + 1);
-      else goTo(index - 1);
-    }
+    if (Math.abs(dx) > 40) goTo(dx < 0 ? index + 1 : index - 1);
     touchStartX = null;
   });
 
-  function scheduleSave() {
-    saveLocalCache();
-    els.saveStatus.textContent = 'Сохранение…';
-    els.saveStatus.className = 'save-status';
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(doSave, 700);
-  }
-
-  async function doSave() {
-    if (!FIREBASE_CONFIGURED) {
-      els.saveStatus.textContent = 'Сохранено локально (Firebase не настроен)';
-      els.saveStatus.className = 'save-status';
-      return;
-    }
-    try {
-      await fbReady();
-      const db = initFirebase();
-      const payload = { isu: student.isu, name: student.name, weekId: WEEK_ID, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-      CARDS.forEach((card) => {
-        const a = answers[card.key];
-        if (!a || !a._touched) return;
-        const clean = { ...a };
-        delete clean._touched;
-        if (card.isWellbeing) payload.wellbeing = clean;
-        else {
-          payload.subjects = payload.subjects || {};
-          payload.subjects[card.key] = clean;
-        }
-      });
-      await db.collection('weeks').doc(WEEK_ID).collection('responses').doc(student.isu).set(payload, { merge: true });
-      els.saveStatus.textContent = 'Сохранено ✓';
-      els.saveStatus.className = 'save-status ok';
-    } catch (err) {
-      console.error(err);
-      els.saveStatus.textContent = 'Не удалось сохранить, проверьте интернет';
-      els.saveStatus.className = 'save-status';
-    }
-  }
-
-  async function loadFromFirestore() {
-    if (!FIREBASE_CONFIGURED) return;
-    try {
-      await fbReady();
-      const db = initFirebase();
-      const snap = await db.collection('weeks').doc(WEEK_ID).collection('responses').doc(student.isu).get();
-      if (snap.exists) {
-        const data = snap.data();
-        CARDS.forEach((card) => {
-          const src = card.isWellbeing ? data.wellbeing : data.subjects && data.subjects[card.key];
-          if (src) answers[card.key] = { ...src, _touched: true };
-        });
-        renderTrack();
-        renderDots();
-      }
-    } catch (err) {
-      console.error('load failed', err);
-    }
-  }
-
-  function startSurvey() {
-    els.loginScreen.hidden = true;
-    els.surveyScreen.hidden = false;
-    els.studentName.textContent = student.name;
-    els.weekLabel.textContent = formatWeekLabel(WEEK_ID);
-    els.adminLink.hidden = !student.admin;
-    answers = loadLocalCache();
-    renderTrack();
-    renderDots();
-    loadFromFirestore();
-  }
+  els.retryBtn.addEventListener('click', loadWeek);
 
   els.adminLink.addEventListener('click', () => {
+    flush();
     window.location.href = 'admin.html';
   });
 
-  els.logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('j3110_student');
-    location.reload();
+  els.logoutBtn.addEventListener('click', async () => {
+    // Без сети set() не завершится, пока связь не вернётся — не держим выход дольше пары секунд.
+    await Promise.race([flush(), new Promise((resolve) => setTimeout(resolve, 3000))]);
+    if (editVersion !== savedVersion && !confirm('Часть ответов ещё не сохранилась. Всё равно выйти?')) return;
+    if (weekId) clearDraft();
+    signOutUser();
   });
-
-  els.loginBtn.addEventListener('click', doLogin);
-  els.surnameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') doLogin();
-  });
-
-  async function doLogin() {
-    if (!FIREBASE_CONFIGURED) {
-      els.loginError.textContent = 'Firebase не настроен, вход недоступен.';
-      return;
-    }
-    els.loginBtn.disabled = true;
-    els.loginError.textContent = '';
-    try {
-      const found = await findStudent(els.isuInput.value, els.surnameInput.value);
-      if (!found) {
-        els.loginError.textContent = 'Не нашли такого человека в списке группы. Проверьте ИСУ и фамилию.';
-        return;
-      }
-      student = found;
-      localStorage.setItem('j3110_student', JSON.stringify(student));
-      startSurvey();
-    } catch (err) {
-      console.error(err);
-      els.loginError.textContent = 'Не удалось проверить список группы, проверьте интернет и попробуйте снова.';
-    } finally {
-      els.loginBtn.disabled = false;
-    }
-  }
-
-  // auto-login from previous session (trusts local cache, no re-check against roster)
-  try {
-    const cached = JSON.parse(localStorage.getItem('j3110_student') || 'null');
-    if (cached && cached.isu && cached.name) {
-      student = cached;
-      startSurvey();
-    }
-  } catch {}
 })();

@@ -1,6 +1,6 @@
 node_modules/
 .claude/
-roster.local.js
+*.local.*
 *firebase-adminsdk*.json
 *serviceAccount*.json
 *.pem

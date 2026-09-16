@@ -1,24 +1,45 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Любой, кто анонимно вошёл через приложение (Firebase Anonymous Auth),
-    // может читать и писать ответы опроса. Это не защищает от того, что
-    // одногруппник теоретически может открыть консоль браузера и отредактировать
-    // чужой ответ, но полностью закрывает базу от случайных ботов/чужих людей
-    // из интернета, которые не открывали сайт.
+
+    // Аккаунты создаёт scripts/setup-firebase.js: uid = ИСУ, у старосты custom claim admin = true.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function pad2(n) {
+      return n < 10 ? '0' + string(n) : string(n);
+    }
+
+    // Понедельник текущей недели по Москве (UTC+3), YYYY-MM-DD — то же, что getWeekId() в common.js.
+    function currentWeekId() {
+      let msk = request.time + duration.value(3, 'h');
+      let monday = msk - duration.value(msk.dayOfWeek() - 1, 'd');
+      return string(monday.year()) + '-' + pad2(monday.month()) + '-' + pad2(monday.day());
+    }
+
     match /weeks/{weekId}/responses/{isu} {
-      allow read, write: if request.auth != null;
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == isu);
+      allow create, update: if signedIn()
+        && request.auth.uid == isu
+        && weekId == currentWeekId()
+        && request.resource.data.keys().hasOnly(['isu', 'weekId', 'updatedAt', 'subjects', 'wellbeing'])
+        && request.resource.data.isu == isu
+        && request.resource.data.weekId == weekId
+        && request.resource.data.updatedAt == request.time;
     }
-    // Тот же доступ, но через рекурсивный шаблон — нужен, чтобы дашборд
-    // мог делать collectionGroup('responses') запрос сразу по всем неделям.
+
+    // Для collectionGroup('responses') в дашборде — только чтение и только староста.
     match /{path=**}/responses/{isu} {
-      allow read, write: if request.auth != null;
+      allow read: if isAdmin();
     }
+
     match /roster/{isu} {
-      allow read: if request.auth != null;
-      // Список группы правится только через локальный сид-скрипт (Admin SDK),
-      // а не с сайта, поэтому клиентам запись сюда не нужна.
-      allow write: if false;
+      allow read: if isAdmin();
     }
   }
 }
